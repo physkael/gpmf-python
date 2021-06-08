@@ -1,8 +1,33 @@
+# From Lists to Objects
+Quick idea: I started the GPMF stream reader in Python. My zeroth implementation
+was 100% functional programming and I used list pairs of `(FOURCC, DATA)` to 
+represent the in-memory structure in the GPMF file. It works fine but it's a 
+little clumsy and frankly just doesn't seem like what one would expect from a
+decent Python implementation. 
+
+So I use the opportunity to document my objectification of the basic functional
+implementation. Maybe this is useful to someone.
+
+## Intro to GPMF
+This is better documented in the GitHub gpmf-parser repo. Look there for a full
+explanation of GPMF which is how I got from zero to hero on the topic. Briefly,
+GPMF is a streaming binary somewhat-self-documenting-and-flexible format for
+capturing GoPro telemetry data in an MP4 file as one of the streams.
+
+GPMF allows nesting data so I guess you can think of it like a filesystem 
+with nested directories, some arbitrary number of files in each directory, 
+and data in those files.
+
+## Implementation Zero: List Pairs
+My first attempt to get something quickly together to read a file into a 
+somewhat more usable in-memory Python data structure was simply to have a
+list of `(FOURCC, DATA)` pairs. The DATA could be itself a list of `(FOURCC, DATA)`
+pairs and so-on &c. Here's the code
+
+```python
 import struct
 from io import BytesIO
 
-# These are the GPMF data types mapped onto standard struct pack/unpack formats.
-# Because GPMF supports 2-D arrays somewhat I store the elemental datum size too.
 KLV_STD_TYPE_MAP = {
     b'B': (1, 'B'),
     b'b': (1, 'b'),
@@ -16,26 +41,8 @@ KLV_STD_TYPE_MAP = {
     b'S': (2, 'H')
 }
 
-# OO - a Frame class 
-class Frame:
-    def add_element(self, fourcc, data):
-        if fourcc in self.__dict__:
-            if type(self.__dict__[fourcc]) is list:
-                self.__dict__[fourcc].append(data)
-            else:
-                self.__dict__[fourcc] = [self.__dict__[fourcc], data]
-        else:
-            self.__dict__[fourcc] = data
-
-    def __repr__(self):
-        txt = "Frame ("
-        for x in self.__dict__:
-            txt += x + ","
-        txt += ")"
-        return txt 
-
 def ReadKLV(stream):
-    r = Frame()
+    r = []
 
     while True:
         
@@ -77,7 +84,9 @@ def ReadKLV(stream):
                 data = (klv_type, klv_size, klv_count)
 
         # print (fourcc, klv_type, klv_size, klv_count, data)
-
-        r.add_element(fourcc, data)
+        r.append((fourcc, data))
         
+```
 
+This works OK. Would be nice if I could navigate the data structure a bit less
+clumsily than `my_list[1][1][14][27][1]`.
