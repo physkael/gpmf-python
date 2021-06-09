@@ -29,9 +29,12 @@ class Frame:
 
     def __repr__(self):
         txt = "Frame ("
-        for x in self.__dict__:
-            txt += x + ","
-        txt += ")"
+        for x, v in self.__dict__.items():
+            xtxt = x
+            if type(v) is list:
+                xtxt += f"[{len(v)}]"
+            txt += xtxt + ","
+        txt = txt[0:-1] + ")"
         return txt 
 
 def ReadKLV(stream):
@@ -53,6 +56,7 @@ def ReadKLV(stream):
             # null type means nested stream
             data = ReadKLV(BytesIO(buf))
         elif klv_type == b'c':
+            # Somehow strings feel different 
             fmt = f'{n_bytes}s'
             data, = struct.unpack(fmt, buf[:n_bytes])
             try:
@@ -60,6 +64,10 @@ def ReadKLV(stream):
             except UnicodeDecodeError:
                 print ("ERROR DECODING STRING:", data)
                 data = None
+        elif klv_type == b'U':
+            # UTC date/time 16-character string
+            data, = struct.unpack('>16s', buf)
+            data = data.decode('iso-8859-1')
         else:
             if klv_type in KLV_STD_TYPE_MAP:
                 size, fmt_char = KLV_STD_TYPE_MAP[klv_type]
